@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Teachable Machine Image Model</title>
+  <style>
+    body {
+      background-color: #ff9900;
+      font-family: "Arial", sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 32px;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    #webcam-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #ffffff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    #webcam-container video {
+      width: 20%;
+      max-width: 600px;
+      height: auto;
+    }
+
+    #label-container {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    #label-container div {
+      display: inline-block;
+      margin: 5px;
+      padding: 10px 20px;
+      background-color: #ff9900;
+      color: #ffffff;
+      border-radius: 5px;
+    }
+
+    #vegetable-details-container {
+      text-align: center;
+    }
+
+    .vegetable-details {
+      margin-top: 20px;
+      background-color: #ffffff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .vegetable-details h2 {
+      font-size: 24px;
+      color: #ff9900;
+      margin-bottom: 10px;
+    }
+
+    .vegetable-details p {
+      font-size: 16px;
+      color: #333333;
+      margin-bottom: 0;
+    }
+
+    .vegetable-details img {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+      margin-top: 10px;
+    }
+
+    .loading-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 200px;
+      margin-bottom: 20px;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #ffffff;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes backgroundAnimation {
+      0% {
+        background-position: 0 0;
+      }
+      50% {
+        background-position: 200% 0;
+      }
+      100% {
+        background-position: 0 0;
+      }
+    }
+
+    .background-animation {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      animation: backgroundAnimation 20s linear infinite;
+      background: linear-gradient(
+        -45deg,
+        #ff9900,
+        #ff6347,
+        #ff1493,
+        #800080,
+        #00bfff,
+        #008000
+      );
+      background-size: 400% 400%;
+    }
+
+    .start-button {
+      display: block;
+      margin: auto auto;
+      width: 200px;
+      height: 50px;
+      background-color: #ffffff;
+      color: #ff9900;
+      border: none;
+      border-radius: 10px;
+      font-size: 20px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="background-animation"></div>
+  <div class="container">
+    <h1>Teachable Machine Image Model</h1>
+    <div id="webcam-container">
+      <video style="border-radius: 15px;" autoplay playsinline width="100%" height="auto"></video>
+    </div>
+    <div id="label-container"></div>
+    <div id="vegetable-details-container"></div>
+
+    <button class="start-button" onclick="init()">Start</button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/diL8i_HAY/";
+    let model, webcam, labelContainer, maxPredictions;
+    let isCameraInitialized = false;
+
+    const vegetableDetails = {
+      Onion: {
+        name: "Onion",
+        description: "The onion, also known as the bulb onion or common onion, is a vegetable that is the most widely cultivated species of the genus Allium. It is a biennial plant that grows mainly as an underground bulb.",
+        imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRYWI6mOtDDW7vT3N6v_oy4xvzPELuuuDNjwA&usqp=CAU",
+      },
+      Lemon: {
+        name: "Lemon",
+        description: "The lemon is a species of small evergreen tree native to South Asia, primarily Northeastern India. Lemons are a popular citrus fruit known for their acidic taste and bright yellow color.",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Lemon_-_whole_and_split.jpg/220px-Lemon_-_whole_and_split.jpg",
+      },
+      Tomato: {
+        name: "Tomato",
+        description: "The tomato is a red, edible berry of the plant Solanum lycopersicum. Tomatoes are a versatile fruit used in various culinary preparations and are a rich source of vitamins and antioxidants.",
+        imageUrl: "https://post.healthline.com/wp-content/uploads/2020/09/tomatoes-1200x628-facebook-1200x628.jpg",
+      },
+      Garlic: {
+        name: "Garlic",
+        description: "Garlic is a species in the onion genus, Allium. It is closely related to onions, shallots, and leeks. Garlic is widely used as a flavoring in cooking and has several health benefits.",
+        imageUrl: "https://static.toiimg.com/photo/94930408.cms",
+      },
+      Mango: {
+        name: "Mango",
+        description: "The mango is a juicy stone fruit belonging to the genus Mangifera. It is native to South Asia and is known for its sweet, tropical flavor. Mangos are used in various culinary dishes and desserts.",
+        imageUrl: "https://m.media-amazon.com/images/I/41EvGpCFECL._AC_UF1000,1000_QL80_.jpg",
+      },
+      Potato: {
+        name: "Potato",
+        description: "The potato is a starchy root vegetable native to the Americas. Potatoes are a staple food in many cuisines and are known for their versatility. They can be boiled, baked, fried, or mashed.",
+        imageUrl: "https://m.media-amazon.com/images/I/313dtY-LOEL.jpg",
+      },
+      Pointedgourd:{
+        name : "Pointed Gourd",
+        description : "The pointed gourd, scientifically known as Trichosanthes dioica, is a unique vegetable with interesting attributes. Also called parwal, parval, or patol, it is commonly found in South Asia, including India, Nepal, Bangladesh, and parts of Southeast Asia. What sets the pointed gourd apart is its distinctive shape resembling a pointed cucumber or squash. It belongs to the cucumber family and is known for its medicinal properties. In traditional medicine, it is used to treat various ailments, including digestive disorders, diabetes, and respiratory issues. Pointed gourd is also rich in vitamins, minerals, and dietary fiber, making it a nutritious addition to a balanced diet. Its versatility allows it to be used in a variety of culinary preparations, such as curries, stir-fries, and stews, adding a unique flavor and texture to dishes.",
+        imageUrl : "https://www.bigbasket.com/media/uploads/p/l/30000540_11-fresho-parwal.jpg"
+      }
+
+    };
+
+    async function init() {
+      if (isCameraInitialized) {
+        return;
+      }
+
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+
+      const flip = true;
+      webcam = new tmImage.Webcam(200, 200, flip);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+      labelContainer = document.getElementById("label-container");
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
+
+      isCameraInitialized = true;
+    }
+
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      const predictions = await model.predict(webcam.canvas);
+      for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction = predictions[i].className;
+        const probability = predictions[i].probability.toFixed(2);
+        labelContainer.childNodes[i].innerHTML = classPrediction + ": " + probability;
+
+        if (probability >= 0.9) {
+          showVegetableDetails(classPrediction);
+        }
+      }
+    }
+
+    function showVegetableDetails(vegetable) {
+      const detailsContainer = document.getElementById("vegetable-details-container");
+      const vegetableInfo = vegetableDetails[vegetable];
+
+      // Clear the details container
+      detailsContainer.innerHTML = "";
+
+      if (vegetableInfo && vegetableInfo.name === vegetable) {
+        const detailsElement = document.createElement("div");
+        detailsElement.id = `${vegetable}-details`;
+        detailsElement.className = "vegetable-details";
+        detailsElement.innerHTML = `
+          <h2>${vegetableInfo.name}</h2>
+          <img src="${vegetableInfo.imageUrl}" alt="${vegetableInfo.name}" width="500">
+          <p>${vegetableInfo.description}</p>
+        `;
+
+        detailsContainer.appendChild(detailsElement);
+      }
+    }
+
+    function hideVegetableDetails() {
+      const detailsContainer = document.getElementById("vegetable-details-container");
+      detailsContainer.innerHTML = "";
+    }
+  </script>
+</body>
+</html>
